@@ -1,10 +1,13 @@
 """A simple implementation of the scheme version described in "The Little Schemer".
 
-Currently only the first chapter is implemented.
+Currently only the first two chapters are implemented.
 
 This is a very inefficient implementation. In particular, there is a lot of
 copying of lists that could be avoided with better data structures.
 """
+
+from collections import ChainMap
+
 
 def tokenize(code):
     """Split the code into tokens."""
@@ -25,6 +28,10 @@ def _parse_list(tokens_iter):
             l.append(_parse_list(tokens_iter))
         elif token == ")":
             return l
+        elif token == "#t":
+            l.append(True)
+        elif token == "#f":
+            l.append(False)
         else:
             try:
                 l.append(int(token))
@@ -33,16 +40,54 @@ def _parse_list(tokens_iter):
 
     return l
 
-def eval(prog):
+def eval(expr):
     """Recursively evaluate a parsed program."""
-    if isinstance(prog, list):
-        if not prog:
-            return prog
-        if isinstance(prog[0], str) and prog[0] in funcs:
-            return funcs[prog[0]](*eval(prog[1:]))
-        else:
-            return [eval(u) for u in prog]
-    return prog
+    #print(expr)
+
+    # atoms
+    if not isinstance(expr, list):
+        if expr == "else":
+            return True
+        if expr in context:
+            return context[expr]
+        return expr
+
+    # empty list
+    if not expr:
+        return expr
+    
+    # buitlt-ins
+    if expr[0] == "cond":
+        for clause in expr[1:]:
+            if eval(clause[0]) is True:
+                return eval(clause[1])
+        return None     # undefined behaviour if nothing matches
+    if expr[0] == "or":
+        for test in expr[1:]:
+            if eval(test) is True:
+                return True
+        return False
+    if expr[0] == "define":
+        context[expr[1]] = eval(expr[2])
+        return None
+    if expr[0] == "lambda":
+        def l(*params):
+            global context
+            context = context.new_child()
+            context.update(zip(expr[1], params))
+            r = eval(expr[2])
+            context = context.parents
+            return r
+        return l
+
+    # otherwise recursively evaluate the list
+    expr = [eval(u) for u in expr]
+
+    # evaluate functions
+    if hasattr(expr[0], '__call__'):
+        return expr[0](*eval(expr[1:]))
+    else:
+        return expr
 
 def run(code):
     """Run some scheme code."""
@@ -71,22 +116,43 @@ def is_eq(a1, a2):
     assert isinstance(a1, str) and isinstance(a2, str)
     return a1 == a2
 
-funcs = {
+# The current execution context.
+
+context = ChainMap({
         "car": car,
         "cdr": cdr,
         "cons": cons,
         "null?": is_null,
         "atom?": lambda a: not isinstance(a, list),
         "eq?": is_eq,
-        }
+})
 
-# Test
+# Some basic functions defined in "The Little Schemer".
+
+run("""(
+    (define lat?
+        (lambda (l)
+            (cond
+                ((null? l) #t)
+                ((atom? (car l)) (lat? (cdr l)))
+                (else #f)
+            )
+        )
+    )
+    (define member?
+        (lambda (a lat)
+            (cond
+                ((null? lat) #f)
+                (else (or (eq? (car lat) a)
+                    (member? a (cdr lat))))
+            )
+        )
+    )
+)""")
+
+# Testing
 
 prog = """
-    (eq? 
-        (car (beans beans we need jelly beans))
-        (car (cdr (beans beans we need jelly beans)))
-    )
+    (member? meat (mashed potatoes and meat gravy))
 """
-
 print(run(prog))
