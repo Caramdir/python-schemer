@@ -230,11 +230,20 @@ run("""(
             )
         )
     )
+    (define multisubst
+        (lambda (new old lat)
+            (cond
+                ((null? lat) (quote ()))
+                ((eq? old (car lat)) (cons new (multisubst new old (cdr lat))))
+                (else (cons (car lat) (multisubst new old (cdr lat))))
+            )
+        )
+    )
 )""")
 
 # Testing
 
 prog = """
-    (multiinsertL fried fish (chips and fish or fish and fried))
+    (multisubst fried fish (chips and fish or fish and fried))
 """
 print(run(prog))
