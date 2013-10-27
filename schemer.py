@@ -40,13 +40,13 @@ def _parse_list(tokens_iter):
 
     return l
 
-def eval(expr):
+def eval(expr, is_question=False):
     """Recursively evaluate a parsed program."""
     #print(expr)
 
     # atoms
     if not isinstance(expr, list):
-        if expr == "else":
+        if is_question and expr == "else":
             return True
         if expr in context:
             return context[expr]
@@ -57,12 +57,14 @@ def eval(expr):
         return expr
     
     # buitlt-ins
+    if expr[0] == "quote":
+        return expr[1]
     if expr[0] == "cond":
         for clause in expr[1:]:
-            if eval(clause[0]) is True:
+            if eval(clause[0], is_question=True) is True:
                 return eval(clause[1])
         return None     # undefined behaviour if nothing matches
-    if expr[0] == "or":
+    if is_question and expr[0] == "or":
         for test in expr[1:]:
             if eval(test) is True:
                 return True
@@ -109,7 +111,7 @@ def cons(a, l):
     return l
 
 def is_null(l):
-    assert isinstance(l, list)
+    assert isinstance(l, list), "Argument to null? has to be a list, but is {}.".format(l)
     return not bool(l)
 
 def is_eq(a1, a2):
@@ -148,11 +150,91 @@ run("""(
             )
         )
     )
+    (define rember
+        (lambda (a lat)
+            (cond
+                ((null? lat) (quote ()))
+                ((eq? (car lat) a) (cdr lat))
+                (else (cons (car lat) (rember a (cdr lat))))
+            )
+        )
+    )
+    (define firsts
+        (lambda (l)
+            (cond
+                ((null? l) ())
+                (else (cons (car (car l)) (firsts (cdr l))))
+            )
+        )
+    )
+    (define insertR
+        (lambda (new old lat)
+            (cond
+                ((null? lat) (quote ()))
+                ((eq? old (car lat)) (cons old (cons new (cdr lat))))
+                (else (cons (car lat) (insertR new old (cdr lat))))
+            )
+        )
+    )
+    (define insertL
+        (lambda (new old lat)
+            (cond
+                ((null? lat) (quote ()))
+                ((eq? old (car lat)) (cons new lat))
+                (else (cons (car lat) (insertL new old (cdr lat))))
+            )
+        )
+    )
+    (define subst
+        (lambda (new old lat)
+            (cond
+                ((null? lat) (quote ()))
+                ((eq? old (car lat)) (cons new (cdr lat)))
+                (else (cons (car lat) (subst new old (cdr lat))))
+            )
+        )
+    )
+    (define subst2
+        (lambda (new o1 o2 lat)
+            (cond
+                ((null? lat) (quote ()))
+                ((or (eq? o1 (car lat)) (eq? o2 (car lat))) (cons new (cdr lat)))
+                (else (cons (car lat) (subst2 new o1 o2 (cdr lat))))
+            )
+        )
+    )
+    (define multirember
+        (lambda (a lat)
+            (cond
+                ((null? lat) (quote ()))
+                ((eq? (car lat) a) (multirember a (cdr lat)))
+                (else (cons (car lat) (multirember a (cdr lat))))
+            )
+        )
+    )
+    (define multiinsertR
+        (lambda (new old lat)
+            (cond
+                ((null? lat) (quote ()))
+                ((eq? old (car lat)) (cons old (cons new (multiinsertR new old (cdr lat)))))
+                (else (cons (car lat) (multiinsertR new old (cdr lat))))
+            )
+        )
+    )
+    (define multiinsertL
+        (lambda (new old lat)
+            (cond
+                ((null? lat) (quote ()))
+                ((eq? old (car lat)) (cons new (cons old (multiinsertL new old (cdr lat)))))
+                (else (cons (car lat) (multiinsertL new old (cdr lat))))
+            )
+        )
+    )
 )""")
 
 # Testing
 
 prog = """
-    (member? meat (mashed potatoes and meat gravy))
+    (multiinsertL fried fish (chips and fish or fish and fried))
 """
 print(run(prog))
