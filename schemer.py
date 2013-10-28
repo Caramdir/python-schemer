@@ -1,6 +1,6 @@
 """A simple implementation of the scheme version described in "The Little Schemer".
 
-Currently only the first two chapters are implemented.
+Currently only the first four chapters are implemented.
 
 This is a very inefficient implementation. In particular, there is a lot of
 copying of lists that could be avoided with better data structures.
@@ -69,6 +69,11 @@ def eval(expr, is_question=False):
             if eval(test) is True:
                 return True
         return False
+    if is_question and expr[0] == "and":
+        for test in expr[1:]:
+            if eval(test) is False:
+                return False
+        return True
     if expr[0] == "define":
         context[expr[1]] = eval(expr[2])
         return None
@@ -98,11 +103,11 @@ def run(code):
 # Primitive functions
 
 def car(l):
-    assert isinstance(l, list) and len(l) > 0
+    assert isinstance(l, list) and len(l) > 0, "Argument to 'car' should be a non-empty list, but got {}.".format(l)
     return l[0]
 
 def cdr(l):
-    assert isinstance(l, list) and len(l) > 0
+    assert isinstance(l, list) and len(l) > 0, "Argument to 'cdr' should be a non-empty list, but got {}.".format(l)
     return l[1:]
 
 def cons(a, l):
@@ -111,7 +116,7 @@ def cons(a, l):
     return l
 
 def is_null(l):
-    assert isinstance(l, list), "Argument to null? has to be a list, but is {}.".format(l)
+    assert isinstance(l, list), "Argument to 'null?' has to be a list, but is {}.".format(l)
     return not bool(l)
 
 def is_eq(a1, a2):
@@ -127,6 +132,10 @@ context = ChainMap({
         "null?": is_null,
         "atom?": lambda a: not isinstance(a, list),
         "eq?": is_eq,
+        "add1": lambda n: n + 1,
+        "sub1": lambda n: n - 1,
+        "zero?": lambda n: n is 0,
+        "number?": lambda n: isinstance(n, int),
 })
 
 # Some basic functions defined in "The Little Schemer".
@@ -239,11 +248,163 @@ run("""(
             )
         )
     )
+    (define +
+        (lambda (n m)
+            (cond
+                ((zero? m) n)
+                (else (+ (add1 n) (sub1 m)))
+            )
+        )
+    )
+    (define -
+        (lambda (n m)
+            (cond
+                ((zero? m) n)
+                (else (- (sub1 n) (sub1 m)))
+            )
+        )
+    )
+    (define addtup
+        (lambda (tup)
+            (cond
+                ((null? tup) 0)
+                (else (+ (car tup) (addtup (cdr tup))))
+            )
+        )
+    )
+    (define × 
+        (lambda (n m)
+            (cond
+                ((zero? m) 0)
+                (else (+ n (× n (sub1 m))))
+            )
+        )
+    )
+    (define * ×)
+    (define tup+
+        (lambda (tup1 tup2)
+            (cond
+                ((null? tup1) tup2)
+                ((null? tup2) tup1)
+                (else 
+                    (cons 
+                        (+ (car tup1) (car tup2))
+                        (tup+ (cdr tup1) (cdr tup2))
+                    )
+                )
+            )
+        )
+    )
+    (define >
+        (lambda (n m)
+            (cond
+                ((zero? n) #f)
+                ((zero? m) #t)
+                (else (> (sub1 n) (sub1 m)))
+            )
+        )
+    )
+    (define <
+        (lambda (n m)
+            (> m n)
+        )
+    )
+    (define =
+        (lambda (n m)
+            (cond
+                ((or (> n m) (< n m)) #f)
+                (else #t)
+            )
+        )
+    )
+    (define ↑
+        (lambda (n m)
+            (cond
+                ((zero? m) 1)
+                (else (× n (↑ n (sub1 m))))
+            )
+        )
+    )
+    (define expt ↑)
+    (define ÷
+        (lambda (n m)
+            (cond
+                ((< n m) 0)
+                (else (add1 (÷ (- n m) m)))
+            )
+        )
+    )
+    (define quotient ÷)
+    (define length
+        (lambda (lat)
+            (cond
+                ((null? lat) 0)
+                (else (add1 (length (cdr lat))))
+            )
+        )
+    )
+    (define pick
+        (lambda (n lat)
+            (cond
+                ((zero? (sub1 n)) (car lat))
+                (else (pick (sub1 n) (cdr lat)))
+            )
+        )
+    )
+    (define rempick
+        (lambda (n lat)
+            (cond
+                ((one? n) (cdr lat))
+                (else (cons (car lat) (rempick (sub1 n) (cdr lat))))
+            )
+        )
+    )
+    (define no-nums
+        (lambda (lat)
+            (cond
+                ((null? lat) (quote ()))
+                ((number? (car lat)) (no-nums (cdr lat)))
+                (else (cons (car lat) (no-nums (cdr lat))))
+            )
+        )
+    )
+    (define all-nums
+        (lambda (lat)
+            (cond
+                ((null? lat) (quote ()))
+                ((number? (car lat)) (cons (car lat) (all-nums (cdr lat))))
+                (else (all-nums (cdr lat)))
+            )
+        )
+    )
+    (define eqan?
+        (lambda (a1 a2)
+            (cond
+                ((and (number? a1) (number? a2)) (= a1 a2))
+                ((or (number? a1) (number? a2)) #f)
+                (else (eq? a1 a2))
+            )
+        )
+    )
+    (define occur
+        (lambda (a lat)
+            (cond
+                ((null? lat) 0)
+                ((eqan? a (car lat)) (add1 (occur a (cdr lat))))
+                (else (occur a (cdr lat)))
+            )
+        )
+    )
+    (define one?
+        (lambda  (n)
+            (= n 1)
+        )
+    )
 )""")
 
 # Testing
 
 prog = """
-    (multisubst fried fish (chips and fish or fish and fried))
+    (rempick 3 (lemon meringue salty pie))
 """
 print(run(prog))
