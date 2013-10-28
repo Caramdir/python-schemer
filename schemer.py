@@ -65,15 +65,9 @@ def eval(expr, is_question=False):
                 return eval(clause[1])
         return None     # undefined behaviour if nothing matches
     if is_question and expr[0] == "or":
-        for test in expr[1:]:
-            if eval(test) is True:
-                return True
-        return False
+        return any(eval(test) for test in expr[1:])
     if is_question and expr[0] == "and":
-        for test in expr[1:]:
-            if eval(test) is False:
-                return False
-        return True
+        return all(eval(test) for test in expr[1:])
     if expr[0] == "define":
         context[expr[1]] = eval(expr[2])
         return None
@@ -405,6 +399,6 @@ run("""(
 # Testing
 
 prog = """
-    (rempick 3 (lemon meringue salty pie))
+    
 """
 print(run(prog))
